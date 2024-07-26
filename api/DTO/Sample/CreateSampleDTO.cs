@@ -1,4 +1,4 @@
-namespace backend.DTO.Sample
+namespace api.DTO.Sample
 {
     public class CreateSampleDTO
     {

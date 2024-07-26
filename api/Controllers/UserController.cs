@@ -1,8 +1,8 @@
-using backend.data;
-using backend.Models;
+using api.Data;
+using api.Models;
 using Microsoft.AspNetCore.Mvc;
 
-namespace backend.Controllers
+namespace api.Controllers
 {
     [Route("api/user"), ApiController]
     public class UserController(ApplicationDBContext context) : ControllerBase

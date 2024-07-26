@@ -1,7 +1,7 @@
 
 using System.Threading.Channels;
 
-namespace backend.Services
+namespace api.Services
 {
     public class BackgroundTaskQueue : IBackgroundTaskQueue
     {

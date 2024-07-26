@@ -1,4 +1,4 @@
-namespace backend.Managers.Jobs
+namespace api.Managers.Jobs
 {
     public enum JobStatus
     {

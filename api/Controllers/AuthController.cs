@@ -1,13 +1,13 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
-using backend.data;
-using backend.Helpers;
-using backend.Models;
+using api.Helpers;
+using api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
-using backend.DTO.User;
+using api.DTO.User;
+using api.Data;
 
-namespace backend.Controllers
+namespace api.Controllers
 {
     [Route("api/auth"), ApiController]
     public class AuthController(ApplicationDBContext context, IConfiguration config) : ControllerBase

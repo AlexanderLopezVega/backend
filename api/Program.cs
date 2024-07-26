@@ -1,9 +1,9 @@
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 
-using backend.data;
-using backend.DTO.Sample;
-using backend.Managers.Jobs;
-using backend.Services;
+using api.Data;
+using api.DTO.Sample;
+using api.Managers.Jobs;
+using api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend

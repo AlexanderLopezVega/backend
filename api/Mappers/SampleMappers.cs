@@ -1,16 +1,23 @@
-using backend.DTO.Sample;
-using backend.Models;
+using api.DTO.Sample;
+using api.Models;
 
-namespace backend.Mappers
+namespace api.Mappers
 {
     public static class SampleMappers
     {
         //  Methods
-        public static SampleDTO ToSampleDTO(this Sample sampleModel) => new()
+        public static SampleDTO ToSampleDTO(this Sample sample) => new()
         {
-            ID = sampleModel.ID,
-            Name = sampleModel.Name,
-            ModelFile = File.ReadAllText(sampleModel.ModelPath)
-        };     
+            ID = sample.ID,
+            Name = sample.Name,
+            Description = sample.Description,
+            ModelFile = File.ReadAllText(sample.ModelPath),
+        };
+        public static SamplePreviewDTO ToSamplePreviewDTO(this Sample sample) => new()
+        {
+            ID = sample.ID,
+            Name = sample.Name,
+            Description = sample.Description,
+        };
     }
 }

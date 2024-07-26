@@ -1,4 +1,4 @@
-namespace backend.Models
+namespace api.Models
 {
     public class Sample
     {

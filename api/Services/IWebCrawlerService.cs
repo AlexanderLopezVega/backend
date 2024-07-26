@@ -1,4 +1,4 @@
-namespace backend.Services
+namespace api.Services
 {
     public interface IWebCrawlerService
     {

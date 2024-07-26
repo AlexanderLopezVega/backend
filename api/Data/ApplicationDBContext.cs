@@ -1,7 +1,7 @@
-using backend.Models;
+using api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace backend.data
+namespace api.Data
 {
     public class ApplicationDBContext(DbContextOptions options) : DbContext(options)
     {

@@ -1,4 +1,4 @@
-namespace backend.Managers.Jobs
+namespace api.Managers.Jobs
 {
     public class JobStatusDTO<T> where T : class
     {

@@ -4,7 +4,7 @@ using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 
-namespace backend.Services
+namespace api.Services
 {
     public class WebCrawlerService(IWebHostEnvironment hostEnvironment) : IWebCrawlerService
     {

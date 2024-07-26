@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace backend.Managers.Jobs
+namespace api.Managers.Jobs
 {
     public class JobStatusManager<T> where T : class
     {

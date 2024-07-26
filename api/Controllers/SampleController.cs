@@ -1,17 +1,18 @@
-using backend.data;
-using backend.DTO.Sample;
-using backend.Managers.Jobs;
-using backend.Mappers;
-using backend.Models;
-using backend.Services;
+using api.Data;
+using api.DTO.Sample;
+using api.Managers.Jobs;
+using api.Mappers;
+using api.Models;
+using api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace backend.Controllers
+namespace api.Controllers
 {
     [Route("api/sample"), ApiController]
     public class SampleController
     (
+        ApplicationDBContext dbContext,
         IDbContextFactory<ApplicationDBContext> dbContextFactory,
         IWebCrawlerService webCrawlerService,
         JobStatusManager<SampleDTO> jobStatusManager,
@@ -19,6 +20,10 @@ namespace backend.Controllers
         IWebHostEnvironment hostEnvironment
     ) : ControllerBase
     {
+        /// <summary>
+        /// For use outside of job calls
+        /// </summary>
+        private readonly ApplicationDBContext m_DBContext = dbContext;
         //  Fields
         /// <summary>
         /// For accessing the ApplicationDBContext within job calls
@@ -45,15 +50,17 @@ namespace backend.Controllers
         [HttpGet]
         public IActionResult GetAll()
         {
-            using ApplicationDBContext context = m_DBContextFactory.CreateDbContext();
-            return Ok(context.Samples.Select(s => s.ToSampleDTO()));
+            return Ok(m_DBContext.Samples.Select(s => s.ToSampleDTO()));
+        }
+        [HttpGet("preview")]
+        public IActionResult GetAllPreview()
+        {
+            return Ok(m_DBContext.Samples.Select(s => s.ToSamplePreviewDTO()));
         }
         [HttpGet("{id}")]
         public IActionResult GetByID([FromRoute] int id)
         {
-            using ApplicationDBContext context = m_DBContextFactory.CreateDbContext();
-            Sample? sample = context.Samples.Find(id);
-
+            Sample? sample = m_DBContext.Samples.Find(id);
             return (sample != null) ? Ok(sample.ToSampleDTO()) : NotFound();
         }
         [HttpPost("start-job")]

@@ -1,4 +1,4 @@
-namespace backend.DTO.User
+namespace api.DTO.User
 {
     public class RegisterRequestDTO
     {
