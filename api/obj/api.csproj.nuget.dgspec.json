@@ -1,28 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "E:\\University\\tfg-informatica\\backend\\api\\api.csproj": {}
+    "C:\\Users\\david\\OneDrive\\Desktop\\alex\\api\\api\\api.csproj": {}
   },
   "projects": {
-    "E:\\University\\tfg-informatica\\backend\\api\\api.csproj": {
+    "C:\\Users\\david\\OneDrive\\Desktop\\alex\\api\\api\\api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\University\\tfg-informatica\\backend\\api\\api.csproj",
+        "projectUniqueName": "C:\\Users\\david\\OneDrive\\Desktop\\alex\\api\\api\\api.csproj",
         "projectName": "api",
-        "projectPath": "E:\\University\\tfg-informatica\\backend\\api\\api.csproj",
-        "packagesPath": "C:\\Users\\alexl\\.nuget\\packages\\",
-        "outputPath": "E:\\University\\tfg-informatica\\backend\\api\\obj\\",
+        "projectPath": "C:\\Users\\david\\OneDrive\\Desktop\\alex\\api\\api\\api.csproj",
+        "packagesPath": "C:\\Users\\david\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\david\\OneDrive\\Desktop\\alex\\api\\api\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\alexl\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\david\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -62,6 +59,10 @@
               "target": "Package",
               "version": "[8.0.6, )"
             },
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[8.0.7, )"
+            },
             "Microsoft.EntityFrameworkCore.Design": {
               "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
               "suppressParent": "All",
@@ -69,6 +70,10 @@
               "version": "[8.0.7, )"
             },
             "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[8.0.7, )"
+            },
+            "Microsoft.EntityFrameworkCore.Sqlite": {
               "target": "Package",
               "version": "[8.0.7, )"
             },
@@ -110,7 +115,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.302/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.303/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

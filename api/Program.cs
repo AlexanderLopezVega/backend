@@ -55,10 +55,11 @@ namespace backend
             builder.Services.AddSwaggerGen();
             builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
             builder.Services.AddControllers();
-            builder.Services.AddDbContextFactory<ApplicationDBContext>(options =>
-            {
-                options.UseSqlServer(builder.Configuration.GetConnectionString(ConnectionStringKey));
-            });
+            // builder.Services.AddDbContextFactory<ApplicationDBContext>(options =>
+            // {
+            //     options.UseSqlServer(builder.Configuration.GetConnectionString(ConnectionStringKey));
+            // });
+            builder.Services.AddDbContextFactory<ApplicationDBContext>(options => options.UseSqlite("Data Source=app.db"));
             builder.Services.AddAuthentication().AddJwtBearer();
 
             // builder.Services.AddAuthentication(options =>
