@@ -18,7 +18,7 @@ namespace api.Controllers
 
         //  Methods
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequestDTO loginRequest)
+        public IActionResult Login([FromBody] LoginRequestDTO loginRequest)
         {
             if (loginRequest == null)
                 return BadRequest();
@@ -65,7 +65,7 @@ namespace api.Controllers
             if (!ValidateUser(username, passwordHash))
                 return false;
 
-            string? securityKey = m_Configuration["SecurityKey"];
+            string? securityKey = m_Configuration["SecurityKey"] ?? throw new InvalidOperationException();
             SymmetricSecurityKey secretKey = new(Encoding.UTF8.GetBytes(securityKey));
             SigningCredentials credentials = new(secretKey, SecurityAlgorithms.HmacSha256);
 
