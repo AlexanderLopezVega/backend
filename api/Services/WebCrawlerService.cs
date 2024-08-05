@@ -1,4 +1,3 @@
-
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
@@ -10,11 +9,10 @@ namespace api.Services
     {
         //  Constants
         private const string ModelGeneratorURL = "https://stabilityai-triposr.hf.space";
-        private const int WaitSeconds = 30;
+        private const int WaitSeconds = 60 * 5;
         private const string ImageInputXpath = "//*[@id=\"content_image\"]/div[2]/div/button/input";
         private const string ImagePreviewXPath = "//*[@id=\"content_image\"]/div[2]/div[2]/div/img";
         private const string GenerateButtonXPath = "//*[@id=\"generate\"]";
-        private const string GLBTabXPath = "//*[@id=\"component-16-button\"]";
         private const string DownloadLinkXPath = "//*[@id=\"component-17\"]/div[2]/div/a";
 
         //  Fields
@@ -31,13 +29,12 @@ namespace api.Services
             options.AddArgument("--headless");
 
             ChromeDriver driver = new(options);
+            WebDriverWait wait = new(driver, new TimeSpan(0, 0, WaitSeconds));
 
             try
             {
                 //  Navigate to URL
                 driver.Navigate().GoToUrl(ModelGeneratorURL);
-
-                WebDriverWait wait = new(driver, new TimeSpan(0, 0, WaitSeconds));
 
                 //  Find image input element
                 IWebElement imageInput = wait.Until(ExpectedConditions.ElementExists(By.XPath(ImageInputXpath)));
@@ -54,32 +51,29 @@ namespace api.Services
                 //  Click to generate
                 generateButton.Click();
 
-                //  Find tab button
-                IWebElement tabButton = driver.FindElement(By.XPath(GLBTabXPath));
-
-                tabButton.Click();
-
                 //  Find download link
                 IWebElement downloadLink = wait.Until(ExpectedConditions.ElementIsVisible(By.XPath(DownloadLinkXPath)));
 
-                Thread.Sleep(1000);
+                wait.Until((IWebDriver _) => downloadLink.GetAttribute("href") != null);
 
                 //  Get download URL
-                string downloadURL = downloadLink.GetAttribute("href");
+                string? downloadURL =
+                    downloadLink.GetAttribute("href")
+                    ?? throw new ArgumentException($"Could not find download URL from element {downloadLink.TagName}");
 
-                Console.WriteLine(downloadURL);
+                //  Determine paths
+                string folder = Path.Combine(m_HostEnvironment.ContentRootPath, savePath);
+                string filename = $"{Path.GetFileNameWithoutExtension(imagePath)}.obj";
+                string relativePath = Path.Combine(savePath, filename);
 
-                //  Download 3D model
-                string storageFolder = Path.Combine(m_HostEnvironment.ContentRootPath, savePath);
-                string downloadFilePath = Path.Combine(storageFolder, $"{Path.GetFileNameWithoutExtension(imagePath)}.glb");
+                //  Download OBJ file
                 using HttpClient client = new();
-
                 HttpResponseMessage response = await client.GetAsync(downloadURL);
-
                 response.EnsureSuccessStatusCode();
-                await File.WriteAllBytesAsync(downloadFilePath, await response.Content.ReadAsByteArrayAsync());
+                byte[] fileBytes = await response.Content.ReadAsByteArrayAsync();
+                await File.WriteAllBytesAsync(Path.Combine(folder, filename), fileBytes);
 
-                return downloadFilePath;
+                return relativePath;
             }
             catch (Exception ex) { throw new ApplicationException("Could not download 3D model from the URL with provided image", ex); }
             finally { driver.Quit(); }

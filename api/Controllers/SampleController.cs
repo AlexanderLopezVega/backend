@@ -61,6 +61,7 @@ namespace api.Controllers
         public IActionResult GetByID([FromRoute] int id)
         {
             Sample? sample = m_DBContext.Samples.Find(id);
+
             return (sample != null) ? Ok(sample.ToSampleDTO()) : NotFound();
         }
         [HttpPost("start-job")]
@@ -95,14 +96,14 @@ namespace api.Controllers
         private async Task CreateSampleAsync(CreateSampleDTO createSampleDTO, string imagePath, Guid jobID, CancellationToken token)
         {
             //  Download 3D model
-            string downloadedFilePath = await m_WebCrawlerService.Download3DModelAsync(imagePath);
+            string filePath = await m_WebCrawlerService.Download3DModelAsync(imagePath);
 
             //  Create sample
             Sample sample = new()
             {
                 Name = createSampleDTO.Name,
                 Description = createSampleDTO.Description,
-                ModelPath = downloadedFilePath,
+                ModelPath = filePath,
                 Collections = []
             };
 
@@ -116,7 +117,7 @@ namespace api.Controllers
             {
                 Name = sample.Name,
                 Description = sample.Description,
-                ModelFile = System.IO.File.ReadAllText(downloadedFilePath)
+                ModelFile = System.IO.File.ReadAllText(filePath)
             };
 
             m_JobStatusManager.UpdateJobStatus(jobID, JobStatus.Completed, sampleDTO);
