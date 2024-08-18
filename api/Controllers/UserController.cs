@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers
 {
-    [Route("api/user"), ApiController]
+    [Route("api/users"), ApiController]
     public class UserController(ApplicationDBContext context) : ControllerBase
     {
         //  Fields
@@ -22,6 +22,18 @@ namespace api.Controllers
             User? user = m_Context.Users.Find(id);
 
             return (user != null) ? Ok(user) : NotFound();
+        }
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete([FromRoute] int id)
+        {
+            User? user = m_Context.Users.Find(id);
+
+            if (user == null) return NotFound();
+
+            m_Context.Users.Remove(user);
+            await m_Context.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }

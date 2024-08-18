@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using api.DTO.User;
 using api.Data;
+using System.Security.Claims;
 
 namespace api.Controllers
 {
@@ -23,10 +24,10 @@ namespace api.Controllers
             if (loginRequest == null)
                 return BadRequest();
 
-            if (!LoginWithCredentials(loginRequest.Username, loginRequest.PasswordHash, out string? token))
+            if (!LoginWithCredentials(loginRequest.Username, loginRequest.PasswordHash, out string? token, out int userID))
                 return BadRequest();
 
-            return Ok(new { Token = token });
+            return Ok(new { Token = token, UserID = userID });
         }
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDTO registerRequest)
@@ -53,42 +54,55 @@ namespace api.Controllers
             await m_Context.Users.AddAsync(user);
             await m_Context.SaveChangesAsync();
 
-            if (!LoginWithCredentials(registerRequest.Username, registerRequest.PasswordHash, out string? token))
+            if (!LoginWithCredentials(registerRequest.Username, registerRequest.PasswordHash, out string? token, out int userID))
                 return BadRequest();
 
-            return Ok(new { Token = token });
+            return Ok(new { Token = token, UserID = userID });
         }
-        private bool LoginWithCredentials(string username, string passwordHash, out string? token)
+        private bool LoginWithCredentials(string username, string passwordHash, out string? token, out int userID)
         {
             token = null;
 
-            if (!ValidateUser(username, passwordHash))
+            if (!ValidateUser(username, passwordHash, out userID))
                 return false;
 
-            string? securityKey = m_Configuration["SecurityKey"] ?? throw new InvalidOperationException();
-            SymmetricSecurityKey secretKey = new(Encoding.UTF8.GetBytes(securityKey));
-            SigningCredentials credentials = new(secretKey, SecurityAlgorithms.HmacSha256);
-
-            JwtSecurityToken tokenOptions = new(
-                issuer: "*",
-                audience: "*",
-                claims: [],
-                expires: DateTime.Now.AddMinutes(5),
-                signingCredentials: credentials
-            );
-
-            token = new JwtSecurityTokenHandler().WriteToken(tokenOptions);
+            token = GenerateJwtToken(username);
 
             return true;
         }
-        private bool ValidateUser(string username, string passwordHash)
+        private bool ValidateUser(string username, string passwordHash, out int userID)
         {
+            userID = -1;
             User? user = m_Context.Users.Where((user) => user.Username == username).FirstOrDefault();
 
-            if (user == null)
-                return false;
+            if (user == null) return false;
 
-            return PasswordHelper.VerifyPassword(passwordHash, user.PasswordHash, user.PasswordSalt);
+            bool passwordValid = PasswordHelper.VerifyPassword(passwordHash, user.PasswordHash, user.PasswordSalt);
+
+            if (!passwordValid) return false;
+
+            userID = user.ID;
+
+            return true;
+        }
+        private string GenerateJwtToken(string username)
+        {
+            string securityKeyConfig = m_Configuration["SecurityKey"] ?? throw new InvalidOperationException("Security key not found");
+            var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(securityKeyConfig));
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, username),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            SecurityToken token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(30),
+                signingCredentials: credentials);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

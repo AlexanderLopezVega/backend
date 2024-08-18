@@ -17,7 +17,9 @@ namespace api.Services
         {
             while (!token.IsCancellationRequested)
             {
+                Console.WriteLine("Waiting for workItem");
                 Func<CancellationToken, Task> workItem = await m_TaskQueue.DequeueAsync(token);
+                Console.WriteLine("WorkItem found. Starting...");
 
                 try
                 {

@@ -45,6 +45,7 @@ namespace api
         }
         private static void ConfigureServices(WebApplicationBuilder builder)
         {
+            //  CORS configuration
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowSpecificOrigin", builder =>
@@ -52,15 +53,24 @@ namespace api
                     builder.WithOrigins("http://localhost:3000").AllowAnyMethod().AllowAnyHeader();
                 });
             });
+
+            //  Services
             builder.Services.AddHostedService<ModelGenerationService>();
+            builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
+            builder.Services.AddScoped<ICleanupService, CleanupService>();
+                        
+            //  Singletons
             builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
             builder.Services.AddSingleton<JobStatusManager<SampleDTO>>();
             builder.Services.AddSingleton<JobStatusManager<ModelDTO>>();
+
+            //  Other
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
-            builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
             builder.Services.AddControllers();
             builder.Services.AddDbContextFactory<ApplicationDBContext>(options => options.UseSqlite("Data Source=app.db"));
+
+            //  Authentication
             builder.Services.AddAuthentication().AddJwtBearer();
         }
     }

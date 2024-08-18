@@ -11,6 +11,8 @@ namespace api.Mappers
             ID = sample.ID,
             Name = sample.Name,
             Description = sample.Description,
+            Tags = sample.Tags,
+            PublicationStatus = sample.PublicationStatus,
             ModelFile = File.ReadAllText(sample.ModelPath),
         };
         public static SamplePreviewDTO ToSamplePreviewDTO(this Sample sample) => new()

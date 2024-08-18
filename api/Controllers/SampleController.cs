@@ -1,61 +1,43 @@
+using System.Security.Claims;
 using api.Data;
 using api.DTO.Sample;
-using api.Managers.Jobs;
 using api.Mappers;
 using api.Models;
-using api.Services;
+using api.Other;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers
 {
-    [Route("api/sample"), ApiController]
+    [Route("api/samples"), ApiController]
     public class SampleController
     (
         ApplicationDBContext dbContext,
-        IDbContextFactory<ApplicationDBContext> dbContextFactory,
-        IWebCrawlerService webCrawlerService,
-        JobStatusManager<SampleDTO> jobStatusManager,
-        IBackgroundTaskQueue taskQueue,
-        IWebHostEnvironment hostEnvironment
+        IDbContextFactory<ApplicationDBContext> dbContextFactory
     ) : ControllerBase
     {
+        //  Fields
         /// <summary>
         /// For use outside of job calls
         /// </summary>
         private readonly ApplicationDBContext m_DBContext = dbContext;
-        //  Fields
         /// <summary>
         /// For accessing the ApplicationDBContext within job calls
         /// </summary>
         private readonly IDbContextFactory<ApplicationDBContext> m_DBContextFactory = dbContextFactory;
-        /// <summary>
-        /// For generating 3D models
-        /// </summary>
-        private readonly IWebCrawlerService m_WebCrawlerService = webCrawlerService;
-        /// <summary>
-        /// For consulting the status of sample creation jobs
-        /// </summary>
-        private readonly JobStatusManager<SampleDTO> m_JobStatusManager = jobStatusManager;
-        /// <summary>
-        /// For handling job queueing
-        /// </summary>
-        private readonly IBackgroundTaskQueue m_TaskQueue = taskQueue;
-        /// <summary>
-        /// For directory handling
-        /// </summary>
-        private readonly IWebHostEnvironment m_HostEnvironment = hostEnvironment;
 
         //  Methods
-        [HttpGet]
-        public IActionResult GetAll()
+        [HttpGet("previews")]
+        public IActionResult GetAllPreview([FromQuery] int? user, [FromQuery] string? name)
         {
-            return Ok(m_DBContext.Samples.Select(s => s.ToSampleDTO()));
-        }
-        [HttpGet("preview")]
-        public IActionResult GetAllPreview()
-        {
-            return Ok(m_DBContext.Samples.Select(s => s.ToSamplePreviewDTO()));
+            IQueryable<Sample> query = m_DBContext.Samples.AsQueryable();
+
+            if (user.HasValue)
+                query = query.Where(s => s.User.ID == user.Value);
+            if (name != null)
+                query = query.Where(s => EF.Functions.Like(s.Name, $"%{name}%"));
+
+            return Ok(query.Select(s => s.ToSamplePreviewDTO()));
         }
         [HttpGet("{id}")]
         public IActionResult GetByID([FromRoute] int id)
@@ -64,63 +46,64 @@ namespace api.Controllers
 
             return (sample != null) ? Ok(sample.ToSampleDTO()) : NotFound();
         }
-        [HttpPost("start-job")]
-        public async Task<IActionResult> StartCreateSampleJob(CreateSampleDTO createSampleDTO)
+        [HttpPost()]
+        public async Task<IActionResult> CreateSample(CreateSampleDTO createSampleDTO)
         {
-            //  Store image for web crawler service
-            IFormFile file = createSampleDTO.ModelImage;
-            string temporaryFolder = Path.Combine(m_HostEnvironment.ContentRootPath, "tmp");
+            string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            //  Ensure temporary folder exists
-            if (!Directory.Exists(temporaryFolder))
-                Directory.CreateDirectory(temporaryFolder);
+            if (userIDString == null) return BadRequest();
 
-            //  Store image in temporary folder
-            string imagePath = Path.Combine(temporaryFolder, file.FileName);
-            using (Stream fileStream = new FileStream(imagePath, FileMode.Create)) { await file.CopyToAsync(fileStream); }
+            int userID = int.Parse(userIDString);
+            User? user = m_DBContext.Users.Find(userID);
 
-            //  Add job to background service
-            Guid jobID = Guid.NewGuid();
-            m_JobStatusManager.UpdateJobStatus(jobID, JobStatus.Processing);
-            m_TaskQueue.QueueBackgroundWorkItem(async (token) => await CreateSampleAsync(createSampleDTO, imagePath, jobID, token));
+            if (user == null) return BadRequest();
 
-            return Ok(new JobStatusDTO<SampleDTO>() { ID = jobID, Status = JobStatus.Processing, Data = null });
-        }
-        [HttpGet("job-status/{ID}")]
-        public IActionResult GetJobStatus(Guid ID)
-        {
-            JobStatusDTO<SampleDTO>? jobStatus = m_JobStatusManager.GetJobStatus(ID);
+            string tempFilePath = $"Public/3D Models/Temp/{createSampleDTO.ModelID}.obj";
+            bool modelExists = System.IO.File.Exists($"Public/3D Models/Temp/{createSampleDTO.ModelID}.obj");
 
-            return (jobStatus == null) ? NotFound() : Ok(jobStatus);
-        }
-        private async Task CreateSampleAsync(CreateSampleDTO createSampleDTO, string imagePath, Guid jobID, CancellationToken token)
-        {
-            //  Download 3D model
-            string filePath = await m_WebCrawlerService.Download3DModelAsync(imagePath);
+            string returnJSON = "{\"path\": \"" + tempFilePath + "\"}";
+
+            //  Model does not exist in Temp folder (probably expired)
+            if (!modelExists) return BadRequest(returnJSON);
+
+            //  Move model to permanent folder
+            string filePath = $"Public/3D Models/{createSampleDTO.ModelID}.obj";
+            System.IO.File.Move(tempFilePath, filePath, true);
 
             //  Create sample
             Sample sample = new()
             {
                 Name = createSampleDTO.Name,
                 Description = createSampleDTO.Description,
+                Tags = createSampleDTO.Tags,
+                PublicationStatus = createSampleDTO.PublicationStatus,
                 ModelPath = filePath,
+                User = user,
                 Collections = []
             };
 
             //  Store sample in database
             using ApplicationDBContext context = m_DBContextFactory.CreateDbContext();
             context.Samples.Add(sample);
-            await context.SaveChangesAsync(token);
+            await context.SaveChangesAsync();
 
-            //  Update job status with results
-            SampleDTO sampleDTO = new()
+            return Ok(sample.ID);
+        }
+        [HttpDelete()]
+        public async Task<IActionResult> DeleteSample([FromBody] DeleteSamplesDTO deleteSamples, CancellationToken token)
+        {
+            return await Task.Run(async () =>
             {
-                Name = sample.Name,
-                Description = sample.Description,
-                ModelFile = System.IO.File.ReadAllText(filePath)
-            };
+                IEnumerable<Sample> samples = m_DBContext.Samples.Where(sample => deleteSamples.SampleIDs.Contains(sample.ID));
 
-            m_JobStatusManager.UpdateJobStatus(jobID, JobStatus.Completed, sampleDTO);
+                foreach (Sample sample in samples)
+                    System.IO.File.Delete(sample.ModelPath);
+
+                m_DBContext.Samples.RemoveRange(samples);
+                await m_DBContext.SaveChangesAsync();
+
+                return Ok();
+            }, token);
         }
     }
 }

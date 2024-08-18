@@ -7,14 +7,15 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers
 {
-    [Route("api/model"), ApiController]
+    [Route("api/models"), ApiController]
     public class ModelController
     (
         ApplicationDBContext context,
          IWebHostEnvironment hostEnvironment,
          IWebCrawlerService webCrawlerService,
          JobStatusManager<ModelDTO> jobStatusManager,
-         IBackgroundTaskQueue taskQueue
+         IBackgroundTaskQueue taskQueue,
+         ICleanupService cleanupService
     ) : ControllerBase
     {
         //  Fields
@@ -32,6 +33,10 @@ namespace api.Controllers
         /// For handling job queueing
         /// </summary>
         private readonly IBackgroundTaskQueue m_TaskQueue = taskQueue;
+        /// <summary>
+        /// For delayed cleaning up of temporary data
+        /// </summary>
+        private readonly ICleanupService m_CleanupService = cleanupService;
 
         //  Methods
         [HttpGet("{id}")]
@@ -46,45 +51,83 @@ namespace api.Controllers
 
             return Ok(new ModelDTO() { ModelFile = modelFile });
         }
-        [HttpPost("start-job")]
+        [HttpPost("jobs")]
         public async Task<IActionResult> StartJob(CreateModelDTO createModelDTO)
         {
-            //  Store image for web crawler service
-            string temporaryFolder = Path.Combine(m_HostEnvironment.ContentRootPath, "tmp");
+            Guid jobID = Guid.NewGuid();
 
-            if (!Directory.Exists(temporaryFolder))
-                Directory.CreateDirectory(temporaryFolder);
+            //  Store image for web crawler service
+            string temporaryFolder = Path.Combine(m_HostEnvironment.ContentRootPath, "Public/Images/Temp");
 
             IFormFile file = createModelDTO.ModelImage;
-            string imagePath = Path.Combine(temporaryFolder, file.FileName);
-            using (Stream fileStream = new FileStream(imagePath, FileMode.Create)) { await file.CopyToAsync(fileStream); }
+            string imagePath = Path.Combine(temporaryFolder, $"{jobID}{Path.GetExtension(file.FileName)}");
+            using (Stream fileStream = new FileStream(imagePath, FileMode.Create))
+            {
+                await file.CopyToAsync(fileStream);
+            }
 
             //  Add job to background service
-            Guid jobID = Guid.NewGuid();
+            Console.WriteLine("adding job");
             m_JobStatusManager.UpdateJobStatus(jobID, JobStatus.Processing);
-            m_TaskQueue.QueueBackgroundWorkItem(async (token) => await CreateModelAsync(createModelDTO, imagePath, jobID, token));
+            m_TaskQueue.QueueBackgroundWorkItem(async (token) =>
+            {
+                Console.WriteLine("starting job");
+                await CreateModelAsync(imagePath, jobID, token);
+                ScheduleDataCleanup(imagePath, jobID);
+                Console.WriteLine("job finished");
+            });
 
             return Ok(new JobStatusDTO<ModelDTO>() { ID = jobID, Status = JobStatus.Processing, Data = null });
         }
-        [HttpGet("job-{id}")]
+        [HttpGet("jobs/{id}")]
         public IActionResult GetJob(Guid id)
         {
             JobStatusDTO<ModelDTO>? jobStatus = m_JobStatusManager.GetJobStatus(id);
 
             return (jobStatus == null) ? NotFound() : Ok(jobStatus);
         }
-        private async Task CreateModelAsync(CreateModelDTO createModelDTO, string imagePath, Guid jobID, CancellationToken token)
+        private async Task CreateModelAsync(string imagePath, Guid jobID, CancellationToken token)
         {
             //  Download 3D model
-            string filePath = await m_WebCrawlerService.Download3DModelAsync(imagePath);
+            string filePath = await m_WebCrawlerService.Download3DModelAsync(jobID, imagePath);
 
             //  Update job status with results
-            ModelDTO modelDTO = new()
-            {
-                ModelFile = System.IO.File.ReadAllText(filePath)
-            };
+            string modelFile = System.IO.File.ReadAllText(filePath);
+            ModelDTO modelDTO = new() { ModelFile = modelFile };
 
             m_JobStatusManager.UpdateJobStatus(jobID, JobStatus.Completed, modelDTO);
+        }
+        private void ScheduleDataCleanup(string imagePath, Guid id)
+        {
+            m_CleanupService.ScheduleCleanup((token) =>
+            {
+                TryDeleteTemporaryModel();
+                TryDeleteTemporaryImage();
+            });
+
+            void TryDeleteTemporaryModel()
+            {
+                //  Calculate model filepath
+                string filePath = $"Public/3D Models/Temp/{id}.obj";
+                bool fileExists = System.IO.File.Exists(filePath);
+
+                //  Model has been removed from Temp folder (probably due to form confirmation or cancellation)
+                if (!fileExists) return;
+
+                //  Delete file
+                System.IO.File.Delete(filePath);
+            }
+            void TryDeleteTemporaryImage()
+            {
+                //  Calculate image filepath
+                bool fileExists = System.IO.File.Exists(imagePath);
+
+                //  Model has been removed from Temp folder (probably due to form confirmation or cancellation)
+                if (!fileExists) return;
+
+                //  Delete file
+                System.IO.File.Delete(imagePath);
+            }
         }
     }
 }

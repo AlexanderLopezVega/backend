@@ -25,7 +25,9 @@ namespace api.Services
         {
             workItem = workItem ?? throw new ArgumentNullException(nameof(workItem));
 
-            m_Queue.Writer.TryWrite(workItem);
+            bool wasWritten = m_Queue.Writer.TryWrite(workItem);
+
+            Console.WriteLine(wasWritten);
         }
     }
 }
