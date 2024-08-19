@@ -21,21 +21,9 @@ namespace api.Controllers
         //  Fields
         private readonly ApplicationDBContext m_Context = context;
         private readonly IWebHostEnvironment m_HostEnvironment = hostEnvironment;
-        /// <summary>
-        /// For generating 3D models
-        /// </summary>
         private readonly IWebCrawlerService m_WebCrawlerService = webCrawlerService;
-        /// <summary>
-        /// For consulting the status of sample creation jobs
-        /// </summary>
         private readonly JobStatusManager<ModelDTO> m_JobStatusManager = jobStatusManager;
-        /// <summary>
-        /// For handling job queueing
-        /// </summary>
         private readonly IBackgroundTaskQueue m_TaskQueue = taskQueue;
-        /// <summary>
-        /// For delayed cleaning up of temporary data
-        /// </summary>
         private readonly ICleanupService m_CleanupService = cleanupService;
 
         //  Methods

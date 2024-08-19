@@ -66,7 +66,7 @@ namespace api.Controllers
             if (!ValidateUser(username, passwordHash, out userID))
                 return false;
 
-            token = GenerateJwtToken(username);
+            token = GenerateJwtToken(username, userID);
 
             return true;
         }
@@ -85,7 +85,7 @@ namespace api.Controllers
 
             return true;
         }
-        private string GenerateJwtToken(string username)
+        private string GenerateJwtToken(string username, int userID)
         {
             string securityKeyConfig = m_Configuration["SecurityKey"] ?? throw new InvalidOperationException("Security key not found");
             var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(securityKeyConfig));
@@ -93,14 +93,18 @@ namespace api.Controllers
 
             var claims = new[]
             {
+                new Claim(ClaimTypes.NameIdentifier, userID.ToString()),
                 new Claim(JwtRegisteredClaimNames.Sub, username),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
             SecurityToken token = new JwtSecurityToken(
+                issuer: "GeoVault",
+                audience: "https://localhost:5047",
                 claims: claims,
                 expires: DateTime.Now.AddMinutes(30),
-                signingCredentials: credentials);
+                signingCredentials: credentials
+            );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }

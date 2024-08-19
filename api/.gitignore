@@ -1,0 +1,5 @@
+bin/
+obj/
+Public/3D Models/Temp/*
+Public/Images/*
+.vscode

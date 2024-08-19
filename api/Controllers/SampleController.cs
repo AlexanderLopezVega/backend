@@ -3,7 +3,7 @@ using api.Data;
 using api.DTO.Sample;
 using api.Mappers;
 using api.Models;
-using api.Other;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,23 +13,21 @@ namespace api.Controllers
     public class SampleController
     (
         ApplicationDBContext dbContext,
-        IDbContextFactory<ApplicationDBContext> dbContextFactory
+        IDbContextFactory<ApplicationDBContext> dbContextFactory,
+        ILogger<SampleController> logger
     ) : ControllerBase
     {
         //  Fields
-        /// <summary>
-        /// For use outside of job calls
-        /// </summary>
         private readonly ApplicationDBContext m_DBContext = dbContext;
-        /// <summary>
-        /// For accessing the ApplicationDBContext within job calls
-        /// </summary>
         private readonly IDbContextFactory<ApplicationDBContext> m_DBContextFactory = dbContextFactory;
+        private readonly ILogger<SampleController> m_Logger = logger;
 
         //  Methods
         [HttpGet("previews")]
+        [Authorize]
         public IActionResult GetAllPreview([FromQuery] int? user, [FromQuery] string? name)
         {
+            m_Logger.LogInformation("> Getting all previews");
             IQueryable<Sample> query = m_DBContext.Samples.AsQueryable();
 
             if (user.HasValue)
@@ -47,9 +45,14 @@ namespace api.Controllers
             return (sample != null) ? Ok(sample.ToSampleDTO()) : NotFound();
         }
         [HttpPost()]
-        public async Task<IActionResult> CreateSample(CreateSampleDTO createSampleDTO)
+        public async Task<IActionResult> CreateSample([FromBody] CreateSampleDTO createSampleDTO)
         {
+            Console.WriteLine("waaaaaaaaaaaaaaaaaaaaah");
+            m_Logger.LogInformation("> Posting sample");
+
             string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            m_Logger.LogInformation($"> User ID: {userIDString}");
 
             if (userIDString == null) return BadRequest();
 
