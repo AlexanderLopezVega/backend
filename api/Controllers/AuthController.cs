@@ -7,15 +7,17 @@ using Microsoft.IdentityModel.Tokens;
 using api.DTO.User;
 using api.Data;
 using System.Security.Claims;
+using api.DTO.Auth;
 
 namespace api.Controllers
 {
     [Route("api/auth"), ApiController]
-    public class AuthController(ApplicationDBContext context, IConfiguration config) : ControllerBase
+    public class AuthController(ApplicationDBContext context, IConfiguration config, ILogger<AuthController> logger) : ControllerBase
     {
         //  Fields
         private readonly ApplicationDBContext m_Context = context;
         private readonly IConfiguration m_Configuration = config;
+        private readonly ILogger<AuthController> m_Logger = logger;
 
         //  Methods
         [HttpPost("login")]
@@ -27,7 +29,10 @@ namespace api.Controllers
             if (!LoginWithCredentials(loginRequest.Username, loginRequest.PasswordHash, out string? token, out int userID))
                 return BadRequest();
 
-            return Ok(new { Token = token, UserID = userID });
+            if (token == null)
+                return StatusCode(StatusCodes.Status500InternalServerError);
+
+            return Ok(new AuthLoginDTO { Token = token });
         }
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDTO registerRequest)
@@ -87,16 +92,18 @@ namespace api.Controllers
         }
         private string GenerateJwtToken(string username, int userID)
         {
+            m_Logger.LogInformation("Generating JWT token for user {Username} with id {UserID}", username, userID);
+
             string securityKeyConfig = m_Configuration["SecurityKey"] ?? throw new InvalidOperationException("Security key not found");
             var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(securityKeyConfig));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
-            {
+            Claim[] claims =
+            [
                 new Claim(ClaimTypes.NameIdentifier, userID.ToString()),
                 new Claim(JwtRegisteredClaimNames.Sub, username),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
+            ];
 
             SecurityToken token = new JwtSecurityToken(
                 issuer: "GeoVault",

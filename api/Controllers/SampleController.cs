@@ -3,13 +3,16 @@ using api.Data;
 using api.DTO.Sample;
 using api.Mappers;
 using api.Models;
+using api.Other;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QueryCondition = System.Linq.Expressions.Expression<System.Func<api.Models.Sample, bool>>;
 
 namespace api.Controllers
 {
     [Route("api/samples"), ApiController]
+    [Authorize]
     public class SampleController
     (
         ApplicationDBContext dbContext,
@@ -24,40 +27,73 @@ namespace api.Controllers
 
         //  Methods
         [HttpGet("previews")]
-        [Authorize]
-        public IActionResult GetAllPreview([FromQuery] int? user, [FromQuery] string? name)
+        public IActionResult GetAllPreview([FromQuery] bool? localOnly, [FromQuery] string? name)
         {
             m_Logger.LogInformation("> Getting all previews");
+
+            string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (userIDString == null) return BadRequest();
+
+            int clientID = int.Parse(userIDString);
+
+            m_Logger.LogInformation("> Client ID: {ClientID}", clientID);
+
             IQueryable<Sample> query = m_DBContext.Samples.AsQueryable();
 
-            if (user.HasValue)
-                query = query.Where(s => s.User.ID == user.Value);
+            QueryCondition whereCondition = localOnly.HasValue
+            ? (s) => s.User.ID == clientID
+            : (s) => s.User.ID == clientID || s.PublicationStatus == PublicationStatus.Public;
+
+            query = query.Where(whereCondition);
+
             if (name != null)
                 query = query.Where(s => EF.Functions.Like(s.Name, $"%{name}%"));
 
-            return Ok(query.Select(s => s.ToSamplePreviewDTO()));
+            SamplePreviewDTO[] samples = query.Select(s => s.ToSamplePreviewDTO()).ToArray();
+
+            m_Logger.LogInformation("> Samples: {samples}", samples.Length);
+
+            return Ok(samples);
         }
         [HttpGet("{id}")]
         public IActionResult GetByID([FromRoute] int id)
         {
             Sample? sample = m_DBContext.Samples.Find(id);
 
-            return (sample != null) ? Ok(sample.ToSampleDTO()) : NotFound();
+            if (sample == null) return BadRequest();
+
+            if (sample.PublicationStatus != PublicationStatus.Public)
+            {
+                string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                if (userIDString == null) return BadRequest();
+
+                int userID = int.Parse(userIDString);
+
+                User? user = m_DBContext.Users.Find(userID);
+
+                if (user == null) return BadRequest();
+                if (!sample.User.Equals(user)) return BadRequest();
+            }
+
+            return Ok(sample.ToSampleDTO());
         }
         [HttpPost()]
         public async Task<IActionResult> CreateSample([FromBody] CreateSampleDTO createSampleDTO)
         {
-            Console.WriteLine("waaaaaaaaaaaaaaaaaaaaah");
             m_Logger.LogInformation("> Posting sample");
 
             string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            m_Logger.LogInformation($"> User ID: {userIDString}");
+            m_Logger.LogInformation("> User ID: {UserIDString}", userIDString);
 
             if (userIDString == null) return BadRequest();
 
             int userID = int.Parse(userIDString);
             User? user = m_DBContext.Users.Find(userID);
+
+            m_Logger.LogInformation("> User: {User}", user);
 
             if (user == null) return BadRequest();
 
@@ -66,12 +102,16 @@ namespace api.Controllers
 
             string returnJSON = "{\"path\": \"" + tempFilePath + "\"}";
 
+            m_Logger.LogInformation("> Model temporary filepath: {TempFilePath}", tempFilePath);
+
             //  Model does not exist in Temp folder (probably expired)
             if (!modelExists) return BadRequest(returnJSON);
 
             //  Move model to permanent folder
             string filePath = $"Public/3D Models/{createSampleDTO.ModelID}.obj";
             System.IO.File.Move(tempFilePath, filePath, true);
+
+            m_Logger.LogInformation("> Moved model to permanent folder");
 
             //  Create sample
             Sample sample = new()
@@ -87,8 +127,11 @@ namespace api.Controllers
 
             //  Store sample in database
             using ApplicationDBContext context = m_DBContextFactory.CreateDbContext();
+            context.Attach(user);
             context.Samples.Add(sample);
             await context.SaveChangesAsync();
+
+            m_Logger.LogInformation("> Created new sample {Sample}", sample);
 
             return Ok(sample.ID);
         }
@@ -107,6 +150,27 @@ namespace api.Controllers
 
                 return Ok();
             }, token);
+        }
+        [HttpPatch("")]
+        public async Task<IActionResult> Update([FromBody] SamplePatchDTO samplePatchDTO)
+        {
+            string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (userIDString == null) return BadRequest();
+
+            Sample? sample = m_DBContext.Samples.Find(samplePatchDTO.ID);
+
+            if (sample == null) return BadRequest();
+
+            sample.Name = samplePatchDTO.Name ?? sample.Name;
+            sample.Description = samplePatchDTO.Description ?? sample.Description;
+            sample.Tags = samplePatchDTO.Tags ?? sample.Tags;
+            sample.PublicationStatus = samplePatchDTO.PublicationStatus ?? sample.PublicationStatus;
+
+            m_DBContext.Samples.Update(sample);
+            await m_DBContext.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }

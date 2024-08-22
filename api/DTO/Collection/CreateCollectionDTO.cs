@@ -5,7 +5,6 @@ namespace api.DTO.Collection
     public class CreateCollectionDTO
     {
         //  Properties
-        public int ID { get; set; }
         public required string Name { get; set; }
         public string? Description { get; set; }
         public PublicationStatus PublicationStatus { get; set; }

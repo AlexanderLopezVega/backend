@@ -46,11 +46,14 @@ namespace api.Controllers
 
             if (user == null) return BadRequest();
 
+            // bool collectionAlreadyExists = m_DBContext.Collections.Where((c) => c.User == user && c.Name == createCollectionDTO.Name).Any();
+
+            // if (collectionAlreadyExists) return BadRequest();
+
             List<Sample> samples = [.. m_DBContext.Samples.Where(s => s.User == user)];
 
             Collection collection = new()
             {
-                ID = createCollectionDTO.ID,
                 Name = createCollectionDTO.Name,
                 Description = createCollectionDTO.Description,
                 PublicationStatus = createCollectionDTO.PublicationStatus,
@@ -61,7 +64,7 @@ namespace api.Controllers
             m_DBContext.Collections.Add(collection);
             await m_DBContext.SaveChangesAsync();
 
-            return Ok(collection.ID);
+            return Ok(new CreateCollectionResponseDTO() { ID = collection.ID });
         }
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
