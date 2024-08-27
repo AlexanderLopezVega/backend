@@ -7,7 +7,6 @@ using api.Other;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using QueryCondition = System.Linq.Expressions.Expression<System.Func<api.Models.Sample, bool>>;
 
 namespace api.Controllers
 {
@@ -27,54 +26,61 @@ namespace api.Controllers
 
         //  Methods
         [HttpGet("previews")]
-        public IActionResult GetAllPreview([FromQuery] bool? localOnly, [FromQuery] string? name)
+        public IActionResult GetAllPreview([FromQuery] int? userID, [FromQuery] int? collectionID, [FromQuery] string? name)
         {
+            //  Get client ID
             m_Logger.LogInformation("> Getting all previews");
+            string? clientIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (userIDString == null) return BadRequest();
-
-            int clientID = int.Parse(userIDString);
+            //  If not found, bad request
+            if (clientIDString == null || !int.TryParse(clientIDString, out int clientID))
+                return BadRequest();
 
             m_Logger.LogInformation("> Client ID: {ClientID}", clientID);
+            m_Logger.LogInformation("> User ID?: {UserID}", userID);
 
-            IQueryable<Sample> query = m_DBContext.Samples.AsQueryable();
+            //  Prepare query
+            IEnumerable<Sample> query = m_DBContext.Samples.Include(s => s.Collections).Include(s => s.User).AsEnumerable();
 
-            QueryCondition whereCondition = localOnly.HasValue
-            ? (s) => s.User.ID == clientID
-            : (s) => s.User.ID == clientID || s.PublicationStatus == PublicationStatus.Public;
+            m_Logger.LogInformation("> Before filters count: {Count}", query.Count());
 
-            query = query.Where(whereCondition);
-
+            //  Filter by provided filters
+            if (userID.HasValue)
+                query = query.Where(s => s.User.ID == userID);
+            if (collectionID.HasValue)
+                query = query.Where(s => s.Collections != null && s.Collections.Any(c => c.ID == collectionID));
             if (name != null)
-                query = query.Where(s => EF.Functions.Like(s.Name, $"%{name}%"));
+                query = query.Where(s => s.Name.Contains(name, StringComparison.InvariantCultureIgnoreCase));
 
-            SamplePreviewDTO[] samples = query.Select(s => s.ToSamplePreviewDTO()).ToArray();
+            if (userID != clientID)
+                query = query.Where(s => s.User.ID == clientID || s.PublicationStatus == PublicationStatus.Public);
 
-            m_Logger.LogInformation("> Samples: {samples}", samples.Length);
+            m_Logger.LogInformation("> After filters count: {Count}", query.Count());
 
-            return Ok(samples);
+            //  Return results
+            return Ok(query.Select(s => s.ToSamplePreviewDTO()));
         }
         [HttpGet("{id}")]
         public IActionResult GetByID([FromRoute] int id)
         {
             Sample? sample = m_DBContext.Samples.Find(id);
 
-            if (sample == null) return BadRequest();
+            if (sample == null)
+                return BadRequest();
 
             if (sample.PublicationStatus != PublicationStatus.Public)
             {
                 string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-                if (userIDString == null) return BadRequest();
+                if (userIDString == null)
+                    return BadRequest();
 
                 int userID = int.Parse(userIDString);
 
                 User? user = m_DBContext.Users.Find(userID);
 
-                if (user == null) return BadRequest();
-                if (!sample.User.Equals(user)) return BadRequest();
+                if (user == null || !sample.User.Equals(user))
+                    return BadRequest();
             }
 
             return Ok(sample.ToSampleDTO());
@@ -152,15 +158,17 @@ namespace api.Controllers
             }, token);
         }
         [HttpPatch("")]
-        public async Task<IActionResult> Update([FromBody] SamplePatchDTO samplePatchDTO)
+        public async Task<IActionResult> UpdateSample([FromBody] SamplePatchDTO samplePatchDTO)
         {
             string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (userIDString == null) return BadRequest();
+            if (userIDString == null)
+                return BadRequest();
 
             Sample? sample = m_DBContext.Samples.Find(samplePatchDTO.ID);
 
-            if (sample == null) return BadRequest();
+            if (sample == null)
+                return BadRequest();
 
             sample.Name = samplePatchDTO.Name ?? sample.Name;
             sample.Description = samplePatchDTO.Description ?? sample.Description;

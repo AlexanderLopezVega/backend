@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using api.Data;
 using api.DTO.User;
 using api.Models;
@@ -58,6 +59,11 @@ namespace api.Controllers
 
             if (user == null) return NotFound();
 
+            IQueryable<Sample>? samples = m_DBContext.Samples.Where(s => s.User.ID == user.ID);
+            IQueryable<Collection>? collections = m_DBContext.Collections.Where(c => c.User.ID == user.ID);
+
+            m_DBContext.Samples.RemoveRange(samples);
+            m_DBContext.Collections.RemoveRange(collections);
             m_DBContext.Users.Remove(user);
             await m_DBContext.SaveChangesAsync();
 

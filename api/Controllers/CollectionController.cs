@@ -1,14 +1,18 @@
 using System.Security.Claims;
+using System.Text.Json;
 using api.Data;
 using api.DTO.Collection;
 using api.Mappers;
 using api.Models;
+using api.Other;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers
 {
     [ApiController, Route("api/collections")]
+    [Authorize]
     public class CollectionController(ApplicationDBContext dbContext) : ControllerBase
     {
         //  Fields
@@ -16,42 +20,76 @@ namespace api.Controllers
 
         //  Methods
         [HttpGet("previews")]
-        public IActionResult GetAllPreview([FromQuery] int? user, [FromQuery] string? name)
+        public IActionResult GetAllPreview([FromQuery] int? userID, [FromQuery] string? name)
         {
-            IQueryable<Collection> query = m_DBContext.Collections.AsQueryable();
+            //  Get client ID
+            string? clientIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (user.HasValue)
-                query = query.Where(s => s.User.ID == user.Value);
+            //  If not found, bad request
+            if (clientIDString == null || !int.TryParse(clientIDString, out int clientID))
+                return BadRequest();
+
+            IEnumerable<Collection> query = m_DBContext.Collections.Include(c => c.User).AsEnumerable();
+
+            //  Filter query by provided filters
+            if (userID.HasValue)
+                query = query.Where(s => s.User.ID == userID.Value);
             if (name != null)
-                query = query.Where(s => EF.Functions.Like(s.Name, $"%{name}%"));
+                query = query.Where(s => s.Name.Contains(name, StringComparison.InvariantCultureIgnoreCase));
+
+            if (userID != clientID)
+                query = query.Where(s => s.User.ID == clientID || s.PublicationStatus == PublicationStatus.Public);
 
             return Ok(query.Select(c => c.ToCollectionPreviewDTO()));
         }
         [HttpGet("{id}")]
         public IActionResult GetByID([FromRoute] int id)
         {
-            Collection? collection = m_DBContext.Collections.Find(id);
+            //  Get client ID
+            string? clientIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            return (collection != null) ? Ok(collection.ToCollectionDTO()) : NotFound();
+            //  If not found, bad request
+            if (clientIDString == null || !int.TryParse(clientIDString, out int clientID))
+                return BadRequest();
+
+            Collection? collection = m_DBContext.Collections.Include(c => c.User).Include(c => c.Samples).FirstOrDefault(c => c.ID == id);
+
+            if (collection == null)
+                return NotFound();
+
+            return (collection.User.ID != clientID) ? BadRequest() : Ok(collection.ToCollectionDTO());
         }
         [HttpPost]
         public async Task<IActionResult> Create(CreateCollectionDTO createCollectionDTO)
         {
-            string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+Console.WriteLine("\n\n\n");
+Console.WriteLine(JsonSerializer.Serialize(createCollectionDTO));
+Console.WriteLine("\n\n\n");
 
-            if (userIDString == null) return BadRequest();
+            //  Get client ID
+            string? clientIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            int userID = int.Parse(userIDString);
-            User? user = m_DBContext.Users.Find(userID);
+            //  If not found, bad request
+            if (clientIDString == null || !int.TryParse(clientIDString, out int clientID))
+                return BadRequest("a");
 
-            if (user == null) return BadRequest();
+            User? user = m_DBContext.Users.Find(clientID);
+
+            //  Get user
+            if (user == null)
+                return BadRequest("b");
 
             // bool collectionAlreadyExists = m_DBContext.Collections.Where((c) => c.User == user && c.Name == createCollectionDTO.Name).Any();
 
             // if (collectionAlreadyExists) return BadRequest();
 
-            List<Sample> samples = [.. m_DBContext.Samples.Where(s => s.User == user)];
+            //  Fetch samples
+            List<Sample> samples = [];
 
+            if (createCollectionDTO.SamplesID != null)
+                samples = [.. m_DBContext.Samples.Include(s => s.User).Where(s => s.User.ID == clientID && createCollectionDTO.SamplesID.Contains(s.ID))];
+
+            //  Create collection
             Collection collection = new()
             {
                 Name = createCollectionDTO.Name,
@@ -61,9 +99,11 @@ namespace api.Controllers
                 Samples = samples,
             };
 
+            //  Add and save changes
             m_DBContext.Collections.Add(collection);
             await m_DBContext.SaveChangesAsync();
 
+            //  Return result
             return Ok(new CreateCollectionResponseDTO() { ID = collection.ID });
         }
         [HttpDelete("{id}")]

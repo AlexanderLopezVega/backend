@@ -8,7 +8,6 @@ namespace api.DTO.Collection
         public required string Name { get; set; }
         public string? Description { get; set; }
         public PublicationStatus PublicationStatus { get; set; }
-        public int UserID { get; set; }
         public List<int>? SamplesID { get; set; }
     }
 }
