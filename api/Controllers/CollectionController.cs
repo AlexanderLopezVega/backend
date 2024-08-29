@@ -108,24 +108,26 @@ namespace api.Controllers
         }
         
         [HttpPatch("")]
-        public async Task<IActionResult> UpdateCollection([FromBody] SamplePatchDTO samplePatchDTO)
+        public async Task<IActionResult> UpdateCollection([FromBody] CollectionPatchDTO collectionPatchDTO)
         {
             string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (userIDString == null)
                 return BadRequest();
 
-            Sample? sample = m_DBContext.Samples.Find(samplePatchDTO.ID);
+            Collection? collection = m_DBContext.Collections.Find(collectionPatchDTO.ID);
 
-            if (sample == null)
+            if (collection == null)
                 return BadRequest();
+            
+            List<Sample>? samples = m_DBContext.Samples.Where(s => collectionPatchDTO.SampleIDs.Contains(s.ID)).ToList();
+            collection.Name = collectionPatchDTO.Name ?? collection.Name;
+            collection.Description = collectionPatchDTO.Description ?? collection.Description;
+            collection.Tags = collectionPatchDTO.Tags ?? collection.Tags;
+            collection.PublicationStatus = collectionPatchDTO.PublicationStatus ?? collection.PublicationStatus;
+            collection.Samples = samples;
 
-            sample.Name = samplePatchDTO.Name ?? sample.Name;
-            sample.Description = samplePatchDTO.Description ?? sample.Description;
-            sample.Tags = samplePatchDTO.Tags ?? sample.Tags;
-            sample.PublicationStatus = samplePatchDTO.PublicationStatus ?? sample.PublicationStatus;
-
-            m_DBContext.Samples.Update(sample);
+            m_DBContext.Collections.Update(collection);
             await m_DBContext.SaveChangesAsync();
 
             return Ok();
