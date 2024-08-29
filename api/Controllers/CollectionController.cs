@@ -116,11 +116,13 @@ namespace api.Controllers
                 return BadRequest();
 
             Collection? collection = m_DBContext.Collections.Find(collectionPatchDTO.ID);
+            Console.WriteLine(JsonSerializer.Serialize(collectionPatchDTO));
 
             if (collection == null)
                 return BadRequest();
             
             List<Sample>? samples = m_DBContext.Samples.Where(s => collectionPatchDTO.SampleIDs.Contains(s.ID)).ToList();
+
             collection.Name = collectionPatchDTO.Name ?? collection.Name;
             collection.Description = collectionPatchDTO.Description ?? collection.Description;
             collection.Tags = collectionPatchDTO.Tags ?? collection.Tags;
