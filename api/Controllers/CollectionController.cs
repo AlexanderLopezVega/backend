@@ -62,9 +62,9 @@ namespace api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(CreateCollectionDTO createCollectionDTO)
         {
-Console.WriteLine("\n\n\n");
-Console.WriteLine(JsonSerializer.Serialize(createCollectionDTO));
-Console.WriteLine("\n\n\n");
+            Console.WriteLine("\n\n\n");
+            Console.WriteLine(JsonSerializer.Serialize(createCollectionDTO));
+            Console.WriteLine("\n\n\n");
 
             //  Get client ID
             string? clientIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -106,6 +106,31 @@ Console.WriteLine("\n\n\n");
             //  Return result
             return Ok(new CreateCollectionResponseDTO() { ID = collection.ID });
         }
+        
+        [HttpPatch("")]
+        public async Task<IActionResult> UpdateCollection([FromBody] SamplePatchDTO samplePatchDTO)
+        {
+            string? userIDString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (userIDString == null)
+                return BadRequest();
+
+            Sample? sample = m_DBContext.Samples.Find(samplePatchDTO.ID);
+
+            if (sample == null)
+                return BadRequest();
+
+            sample.Name = samplePatchDTO.Name ?? sample.Name;
+            sample.Description = samplePatchDTO.Description ?? sample.Description;
+            sample.Tags = samplePatchDTO.Tags ?? sample.Tags;
+            sample.PublicationStatus = samplePatchDTO.PublicationStatus ?? sample.PublicationStatus;
+
+            m_DBContext.Samples.Update(sample);
+            await m_DBContext.SaveChangesAsync();
+
+            return Ok();
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
