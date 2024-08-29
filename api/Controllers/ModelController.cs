@@ -45,6 +45,9 @@ namespace api.Controllers
             Guid jobID = Guid.NewGuid();
 
             //  Store image for web crawler service
+            if (!Directory.Exists("Public/Images/Temp"))
+                Directory.CreateDirectory("Public/Images/Temp");
+
             string temporaryFolder = Path.Combine(m_HostEnvironment.ContentRootPath, "Public/Images/Temp");
 
             IFormFile file = createModelDTO.ModelImage;
