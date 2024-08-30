@@ -115,19 +115,24 @@ namespace api.Controllers
             if (userIDString == null)
                 return BadRequest();
 
-            Collection? collection = m_DBContext.Collections.Find(collectionPatchDTO.ID);
-            Console.WriteLine(JsonSerializer.Serialize(collectionPatchDTO));
+            Collection? collection = await m_DBContext.Collections
+            .Include(c => c.Samples) 
+            .FirstOrDefaultAsync(c => c.ID == collectionPatchDTO.ID);
 
             if (collection == null)
                 return BadRequest();
             
             List<Sample>? samples = m_DBContext.Samples.Where(s => collectionPatchDTO.SampleIDs.Contains(s.ID)).ToList();
 
+            collection.Samples?.Clear();
+
             collection.Name = collectionPatchDTO.Name ?? collection.Name;
             collection.Description = collectionPatchDTO.Description ?? collection.Description;
             collection.Tags = collectionPatchDTO.Tags ?? collection.Tags;
             collection.PublicationStatus = collectionPatchDTO.PublicationStatus ?? collection.PublicationStatus;
-            collection.Samples = samples;
+            foreach (var sample in samples) {
+                collection.Samples?.Add(sample);
+            }
 
             m_DBContext.Collections.Update(collection);
             await m_DBContext.SaveChangesAsync();
