@@ -63,7 +63,7 @@ namespace api.Controllers
         [HttpGet("{id}")]
         public IActionResult GetByID([FromRoute] int id)
         {
-            Sample? sample = m_DBContext.Samples.Find(id);
+            Sample? sample = m_DBContext.Samples.Include(s => s.Collections).FirstOrDefault(s => s.ID == id);
 
             if (sample == null)
                 return BadRequest();
